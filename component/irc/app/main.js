@@ -45,7 +45,7 @@ constructor(){
 
   this.addEventListener("channel-removed", ({detail: channel})=>{
     if(channel.list_entry && channel.list_entry.channelentry.parentNode)
-      channel.list_entry.channelentry.parentNode.removeChild(channel.list_entry.channelentry);
+      channel.list_entry.channelentry.remove();
   });
 
   this.addEventListener("resize", ()=>{
@@ -144,10 +144,8 @@ getChannel(name, {create}={}){
     this.channel_list.set(name, promise);
     channel = Component("irc-channel", this.irc);
     channel = await channel;
-    channel.style.display = 'none';
     if(name)
       channel.name = name;
-    this.T.channel.appendChild(channel);
     this.dispatchEvent(new CustomEvent("channel-added", { detail: channel }));
     if(!this.current_channel)
       this.showChannel(name);
@@ -165,7 +163,7 @@ async removeChannel(name){
   this.channel_list.delete(name);
   if(this.current_channel == channel)
     this.current_channel = null;
-  channel.parentNode.removeChild(channel);
+  channel.remove();
   this.dispatchEvent(new CustomEvent("channel-removed", { detail: channel }));
   return true;
 }
@@ -177,8 +175,8 @@ async showChannel(name){
   if(this.current_channel == channel)
     return;
   if(this.current_channel)
-    this.current_channel.style.display = 'none';
-  channel.style.display = '';
+    this.current_channel.remove();
+  this.T.channel.appendChild(channel);
   this.current_channel = channel;
   this.dispatchEvent(new CustomEvent("channel-shown", { detail: channel }));
   return true;

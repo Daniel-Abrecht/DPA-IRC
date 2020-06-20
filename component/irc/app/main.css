@@ -20,7 +20,7 @@ irc-login {
 
 nav {
   display: inline-block;
-  flex: 1;
+  flex-basis: 100%;
   min-width: 16rem;
   max-width: 16rem;
   background-color: transparent;
@@ -35,7 +35,7 @@ nav {
 main {
   display: inline-flex;
   flex-direction: column;
-  flex: 1;
+  flex-basis: 100%;
   order: 2;
   height: 100%;
   white-space: normal;
@@ -47,11 +47,17 @@ main {
 }
 
 [\@="channel"] {
-  flex: 1;
+  position: relative;
+  display: inline-block;
+  flex-basis: 100%;
 }
 
 [\@="channel"] > irc-channel {
-  height: 100%;
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
 }
 
 [\@="channelentry"] {
@@ -112,7 +118,7 @@ main {
 }
 
 [\@=chatline] > textarea {
-  flex: 1;
+  flex-basis: 100%;
   resize: none;
   height: calc(1em * var(--line-height));
   background-color: transparent;
