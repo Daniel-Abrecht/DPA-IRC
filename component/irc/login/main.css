@@ -1,0 +1,61 @@
+
+:host {
+  width: 100%;
+  height: 100%;
+}
+
+:host(.loggedout), :host(.pending) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+:host(:not(.pending)) slot[name=pending] {
+  display: none;
+}
+
+:host(:not(.loggedout)) [\@=login] {
+  display: none;
+}
+
+[\@=login] {
+  display: block;
+  margin: auto 0;
+  padding: 1rem;
+  border: 1px solid var(--fg-color);
+  width: 100%;
+  max-width: 20rem;
+}
+
+[\@=login] label {
+  display: block;
+  margin: 1em 0;
+}
+
+[\@=login] label input {
+  width: calc(100% - 1rem);
+  border: 0 none;
+  background-color: var(--bg-color);
+  padding: 0.25rem 0;
+  margin-top: 0.5rem;
+  color: var(--input-color);
+  border-bottom: 1px solid var(--input-color);
+  font-size: inherit;
+  font-family: monospace;
+}
+
+[\@=login] input[type=submit] {
+  display: block;
+  margin: auto;
+  border: 0 none;
+  font: inherit;
+  color: var(--bg-color);
+  background-color: var(--input-color);
+  padding: 0.5rem 2rem;
+  cursor: pointer;
+  margin-top: 2rem;
+}
+
+:host(:not(.loggedin)) slot:not([name]) {
+  display: none;
+}

@@ -1,0 +1,77 @@
+
+:host {
+  display: flex;
+  flex-direction: column;
+}
+
+h1 {
+  padding: 0.5rem;
+  border-bottom: 1px solid var(--fg-color);
+  margin: 0;
+  font-size: 1.5em;
+  font-family: inherit;
+  font-weight: normal;
+}
+
+[\@=chat] {
+  flex: 1;
+  overflow: auto;
+  padding: 0.2rem;
+  word-wrap: break-word;
+  word-wrap: anywhere;
+  overflow-wrap: anywhere;
+}
+
+[\@=line]::before {
+  content: '[' var(--t) ']';
+}
+
+[\@=line] {
+  font-family: monospace;
+  font-size: inherit;
+  line-height: var(--line-height);
+  color: var(--input-color);
+  padding-bottom: 0.2rem;
+}
+
+[\@=line] [\@=text] {
+  white-space: pre-line;
+}
+
+[\@=line].type-cmderror {
+  color: #F00;
+  font-weight: bold;
+}
+
+[\@=line] [\@=name] {
+  color: var(--nick-color);
+  margin: 0 1ex;
+}
+
+[\@=line] [\@=name]::before {
+  content: '<';
+  color: #ccc;
+}
+
+[\@=line] [\@=name]::after {
+  content: '>';
+  color: #ccc;
+}
+
+[\@=line].action-ACTION [\@=name]::before {
+  content: '* ';
+}
+
+[\@=line].action-ACTION [\@=name]::after {
+  content: '';
+}
+
+[\@=line].mentioned [\@=text] {
+  text-shadow: 1px 0px 0px;
+  color: var(--fg-color);
+}
+
+[\@=line].me [\@=name] {
+  color: var(--fg-color);
+  font-weight: bold;
+}

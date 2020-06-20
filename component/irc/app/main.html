@@ -1,0 +1,20 @@
+<irc-login @="login">
+  <div slot="pending">Connecting...</div>
+  <main>
+    <div @="channel"></div>
+    <form @="chatline">
+      <textarea @="text"></textarea>
+      <input @="submit" type="submit" value="⮞"/>
+    </form>
+  </main>
+  <nav>
+    <div @="channellist">
+      <template @="channel_list_entry">
+        <div @="channelentry">
+          <span @="name"></span>
+          <span @="notifications"></span>
+        </div>
+      </template>
+    </div>
+  </nav>
+</irc-login>

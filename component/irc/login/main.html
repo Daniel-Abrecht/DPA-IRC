@@ -1,0 +1,10 @@
+
+<form @="login">
+  <label>Nick <input @="nick" type="text" required></label>
+  <label>Password <input @="password" type="password"/></label>
+  <label>Server <input @="server" type="text" pattern="^wss?://.+"/></label>
+  <input type="submit" value="Login" />
+</form>
+
+<slot @="content"></slot>
+<slot name="pending">Logging in...</slot>

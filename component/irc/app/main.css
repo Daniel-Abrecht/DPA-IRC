@@ -1,0 +1,122 @@
+
+:host {
+  --input-color: #0F0;
+  --fg-color: #FFF;
+  --bg-color: #000;
+  --line-height: 1.2;
+  background-color: var(--bg-color);
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+irc-login {
+  display: flex;
+}
+
+:host(.mobile) irc-login.loggedin {
+  display: block;
+  white-space: nowrap;
+}
+
+nav {
+  display: inline-block;
+  flex: 1;
+  min-width: 16rem;
+  max-width: 16rem;
+  background-color: transparent;
+  border: 0 none;
+  border-right: 1px solid var(--fg-color);
+  order: 1;
+  height: 100%;
+  white-space: normal;
+  vertical-align: top;
+}
+
+main {
+  display: inline-flex;
+  flex-direction: column;
+  flex: 1;
+  order: 2;
+  height: 100%;
+  white-space: normal;
+  vertical-align: top;
+}
+
+:host(.mobile) main {
+  width: 100%;
+}
+
+[\@="channel"] {
+  flex: 1;
+}
+
+[\@="channel"] > irc-channel {
+  height: 100%;
+}
+
+[\@="channelentry"] {
+  padding: 1rem;
+  border-bottom: 1px solid var(--fg-color);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+[\@="channelentry"].mentioned {
+  font-weight: bold;
+}
+
+[\@="notifications"]:empty {
+  display: none;
+}
+
+[\@="notifications"] {
+  float: right;
+  background-color: var(--fg-color);
+  color: var(--bg-color);
+  border: 1px solid var(--bg-color);
+  border-radius: 100%;
+  padding: 0.25rem;
+  margin: -0.25rem 0;
+  margin-left: 0.25rem;
+}
+
+:host(.mobile) nav {
+  width: 18rem;
+  max-width: 100%;
+  min-width: auto;
+  border-right: 0 none;
+  border-left: 1px solid var(--fg-color);
+}
+
+[\@=chatline] {
+  display: flex;
+  flex-direction: row;
+  border-top: 1px solid var(--fg-color);
+}
+
+[\@=chatline] input[type=submit] {
+  border: 0 none;
+  font: inherit;
+  color: var(--bg-color);
+  background-color: var(--input-color);
+  padding: 0 0.5rem;
+  line-height: var(--line-height);
+  cursor: pointer;
+}
+
+[\@=chatline] textarea {
+  font-family: monospace;
+  font-size: inherit;
+  line-height: var(--line-height);
+  color: var(--input-color);
+}
+
+[\@=chatline] > textarea {
+  flex: 1;
+  resize: none;
+  height: calc(1em * var(--line-height));
+  background-color: transparent;
+  border: 0 none;
+  border-bottom: 1px solid var(--input-color);
+  margin: 0.2rem;
+}
