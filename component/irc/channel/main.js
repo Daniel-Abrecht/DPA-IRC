@@ -39,17 +39,21 @@ scroll_to_bottom(){
 }
 
 log(from, type, text){
+
   let line = this.T.line.create();
   line.line.style.setProperty('--nick-color', this.constructor.strcolor(from.nick||''));
   line.line.classList.add('type-'+type);
+
   if(from){
     line.name.innerText = from.nick;
     if(from.me)
       line.line.classList.add("me");
   }
+
   let [date, time] = (new Date()).toISOString().split(/[TZ.]/);
   line.line.style.setProperty('--d', `'${date}'`);
   line.line.style.setProperty('--t', `'${time}'`);
+
   let action = null;
   {
     let parts = text.match(/^\x01(([A-Z]+) )?(.*)\x01$/);
@@ -61,6 +65,7 @@ log(from, type, text){
   }
   if(action)
     line.line.classList.add("action-" + action);
+
   let mentioned = false;
   {
     let parts = text.split(this.irc.nick);
@@ -70,7 +75,36 @@ log(from, type, text){
   }
   if(mentioned)
     line.line.classList.add("mentioned");
-  line.text.innerText = text;
+
+  text = [text];
+
+  // Detect possible URI
+  text = text.map(x=>{
+    if(typeof x != 'string')
+      return x;
+    let res = [];
+    let uri = [];
+    for(let part of x.replace(
+      /(web\+)?[a-z]{2,10}:((\/\/((([a-zA-Z0-9_\-.]|%[0-9]{2})+:)?([a-zA-Z0-9_\-.]|%[0-9]{2})+@)?([a-z-]+\.)+[a-z-]+(:[0-9]{1,5})?(\/(\.?[a-zA-Z0-9_\-\/?&=]|%[0-9]{2})*)?)|(\.?[:a-zA-Z0-9?&=\/_\-]|%[0-9]{2})+)/g,
+      str => {
+        let a = document.createElement("a");
+        a.target = "_blank";
+        a.href = str;
+        a.innerText = str;
+        uri.push(a);
+        return '\0';
+      }
+    ).split('\0')){
+      res.push(part);
+      if(uri.length)
+        res.push(uri.shift());
+    }
+    return res;
+  }).flat();
+
+  for(let part of text)
+    line.text.appendChild(typeof part == 'string' ? document.createTextNode(part) : part);
+
   let scroll_to_bottom = (this.T.chat.scrollTop+3 >= (this.T.chat.scrollHeight - this.T.chat.offsetHeight));
   this.T.chat.appendChild(line.line);
   if(scroll_to_bottom)

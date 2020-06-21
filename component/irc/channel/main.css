@@ -38,11 +38,6 @@ h1 {
   white-space: pre-line;
 }
 
-[\@=line].type-cmderror {
-  color: #F00;
-  font-weight: bold;
-}
-
 [\@=line] [\@=name] {
   color: var(--nick-color);
   margin: 0 1ex;
@@ -74,4 +69,12 @@ h1 {
 [\@=line].me [\@=name] {
   color: var(--fg-color);
   font-weight: bold;
+}
+
+a {
+  color: var(--link-color);
+}
+
+a:visited {
+  color: var(--link-visited-color);
 }

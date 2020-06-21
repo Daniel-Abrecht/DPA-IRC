@@ -4,6 +4,8 @@
   --fg-color: #FFF;
   --bg-color: #000;
   --line-height: 1.2;
+  --link-color: #0FF;
+  --link-visited-color: #0AA;
   background-color: var(--bg-color);
   overflow-x: auto;
   overflow-y: hidden;
@@ -115,9 +117,7 @@ main {
   font-size: inherit;
   line-height: var(--line-height);
   color: var(--input-color);
-}
-
-[\@=chatline] > textarea {
+  outline: 0 none;
   flex-basis: 100%;
   resize: none;
   height: calc(1em * var(--line-height));

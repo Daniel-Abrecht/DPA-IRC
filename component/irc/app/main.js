@@ -15,8 +15,10 @@ constructor(){
   this.T.text.addEventListener("keydown", event=>this.onkeydown(event));
   this.T.chatline.addEventListener("submit", event=>{
     event.preventDefault();
-    this.send(this.T.text.value);
-    this.T.text.value = '';
+    if(this.send(this.T.text.value)){
+      this.T.text.value = '';
+      this.T.text.style.height = '';
+    }
   });
 
   for(let k of Object.getOwnPropertyNames(Object.getPrototypeOf(this)))
@@ -99,7 +101,9 @@ send(text){
     }
   } catch(error) {
     console.warn(error);
+    return false;
   }
+  return true;
 }
 
 cmd_quote(text){
