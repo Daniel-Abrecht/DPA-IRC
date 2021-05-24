@@ -8,7 +8,14 @@
     </form>
   </main>
   <nav>
-    <div @="channellist">
+    <div @="network_list">
+      <template @="network_list_entry">
+        <div @="networkentry">
+          <div @="name"></div>
+          <div @="channel_list">
+          </div>
+        </div>
+      </template>
       <template @="channel_list_entry">
         <div @="channelentry">
           <span @="name"></span>

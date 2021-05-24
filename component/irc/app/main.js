@@ -1,62 +1,40 @@
+load network
 
 constructor(){
   super();
 
-  this.channel_list = new Map();
   this.current_channel = null;
+
+  this.networks = [new Network(this)];
+  this.current_network = this.networks[0];
+  this.znc_status_msg = '';
 
   this.T.login.addEventListener("login", ({detail})=>this.connect(detail));
 
-  this.irc = new IRC();
-  this.irc.addEventListener('open', ()=>{ this.T.login.state = 'LOGGEDIN'; });
-  this.irc.addEventListener('close', ()=>{ this.T.login.state = 'LOGGEDOUT'; });
+  this.networks[0].addEventListener('open' , ()=>this.onopen ());
+  this.networks[0].addEventListener('close', ()=>this.onclose());
 
   this.T.text.addEventListener("input", event=>this.oninput(event));
   this.T.text.addEventListener("keydown", event=>this.onkeydown(event));
-  this.T.chatline.addEventListener("submit", event=>{
+  this.T.chatline.addEventListener("submit", async event=>{
     event.preventDefault();
-    if(this.send(this.T.text.value)){
+    if(await this.send(this.T.text.value)){
       this.T.text.value = '';
       this.T.text.style.height = '';
     }
   });
+}
 
-  for(let k of Object.getOwnPropertyNames(Object.getPrototypeOf(this)))
-    if(k.startsWith('onirc_') && this[k] instanceof Function)
-      this.irc.addEventListener('irc-'+k.slice(6), (...x)=>this[k](...x));
+onopen(){
+  this.T.login.state = 'LOGGEDIN';
+}
 
-  this.addEventListener("channel-added", ({detail: channel})=>{
-    let entry = this.T.channel_list_entry.create();
-    entry.name.innerText = channel.name;
-    channel.list_entry = entry;
-    entry.channelentry.addEventListener("click", ()=>{
-      entry.channelentry.classList.remove("mentioned");
-      entry.notifications.innerText = '';
-      this.showChannel(channel.name);
-    });
-    channel.addEventListener("update", ()=>{
-      if(this.current_channel != channel)
-        entry.notifications.innerText = (entry.notifications.innerText|0) + 1;
-    });
-    channel.addEventListener("mentioned", ()=>{
-      if(this.current_channel != channel)
-        entry.channelentry.classList.add("mentioned");
-    });
-    this.T.channellist.appendChild(entry.channelentry);
-  });
-
-  this.addEventListener("channel-removed", ({detail: channel})=>{
-    if(channel.list_entry && channel.list_entry.channelentry.parentNode)
-      channel.list_entry.channelentry.remove();
-  });
-
-  this.addEventListener("resize", ()=>{
-    if(this.offsetWidth >= 40 * parseFloat(getComputedStyle(document.documentElement).fontSize)){
-      this.classList.remove("mobile");
-    }else{
-      this.classList.add("mobile");
-    }
-  });
+onclose(){
+  this.T.login.state = 'LOGGEDOUT';
+  while(this.networks.length > 1){
+    let network = this.networks.pop();
+    network.close();
+  }
 }
 
 onkeydown(event){
@@ -75,7 +53,116 @@ oninput(event){
   }
 }
 
-send(text){
+static parse_list(){
+  let state = parse_first_line;
+  let res = {
+    parse: line => state(line),
+    get done(){return !state;},
+    error: false,
+    keys: null,
+    values: [],
+  };
+  let cl;
+  let keys;
+  function parse_first_line(line){
+    if(!/^\+[-+]+\+$/.test(line)){
+      state = null;
+      res.error = true;
+      return;
+    }
+    cl = line.slice(1,-1).split('+').map(x=>x.length);
+    state = parse_keys;
+  }
+  function parse_fields(line){
+    return line.match('^\\|'+cl.map(x=>'('+'.'.repeat(x)+')').join('\\|')+'\\|$').slice(1).map(x=>x.trim());
+  }
+  function parse_keys(line){
+    res.keys = keys = parse_fields(line);
+    if(!keys){
+      state = null;
+      res.error = true;
+      return;
+    }
+    state = parse_seps;
+    return keys;
+  }
+  function parse_seps(line){
+    if(line != '+'+cl.map(x=>'-'.repeat(x)).join('+')+'+'){
+      state = null;
+      res.error = true;
+      return;
+    }
+    state = parse_values;
+  }
+  function parse_values(line){
+    if(line == '+'+cl.map(x=>'-'.repeat(x)).join('+')+'+'){
+      state = null;
+      return;
+    }
+    let values = parse_fields(line);
+    if(!values){
+      state = null;
+      res.error = true;
+      return;
+    }
+    let v = Object.fromEntries(values.map((x,i)=>[keys[i],x]));
+    res.values.push(v);
+    return v;
+  }
+  return res;
+}
+
+handle_znc_status_msg(network, message){
+  if(network != this.networks[0])
+    return;
+  if(!this.znc_status_response_handler)
+    return;
+  if(!this.znc_status_msg)
+    this.znc_status_msg = Main.parse_list();
+  this.znc_status_msg.parse(message);
+  if(this.handle_znc_status_msg_timeout)
+    clearTimeout(this.handle_znc_status_msg_timeout);
+  const done = ()=>{
+    let msg = this.znc_status_msg;
+    this.znc_status_msg = '';
+    this.handle_znc_status_msg_timeout = null;
+    if(this.znc_status_response_handler){
+      let h = this.znc_status_response_handler;
+      this.znc_status_response_handler = null;
+      if(msg.error){
+        h.reject();
+      }else{
+        h.resolve(msg);
+      }
+    }
+  }
+  if(this.znc_status_msg.done)
+    done()
+  this.handle_znc_status_msg_timeout = setTimeout(done, 500);
+}
+
+async znc_status_request(message){
+  if(!this.networks[0].irc.is_znc)
+    return;
+  while(this.znc_status_response_handler){
+    try {
+      await this.znc_status_response_handler;
+    } catch(e) {}
+  }
+  let promise, resolve;
+  promise = new Promise(r=>resolve=r);
+  promise.resolve = resolve;
+  this.znc_status_response_handler = promise;
+  this.handle_znc_status_msg_timeout = setTimeout(()=>{
+    this.handle_znc_status_msg_timeout=null;
+    this.znc_status_response_handler=null;
+    resolve(null);
+  }, 2000);
+  this.networks[0].irc.send("PRIVMSG", {args:['*status', message]});
+  return await this.znc_status_response_handler;
+}
+
+async send(text){
   if(!text.length)
     return;
   try {
@@ -83,9 +170,11 @@ send(text){
     if(command){
       let [_0, cmd, argument] = command;
       if(this['cmd_'+cmd] instanceof Function){
-        this['cmd_'+cmd](argument);
-      }else if(this.current_channel['cmd_'+cmd] instanceof Function){
-        this.current_channel['cmd_'+cmd](argument);
+        await this['cmd_'+cmd](argument);
+      }else if(this.current_network && this.current_network['cmd_'+cmd] instanceof Function){
+        await this.current_network['cmd_'+cmd](argument);
+      }else if(this.current_channel && this.current_channel['cmd_'+cmd] instanceof Function){
+        await this.current_channel['cmd_'+cmd](argument);
       }else{
         throw new Error(`Command "${cmd}" not found`);
       }
@@ -93,8 +182,10 @@ send(text){
       for(let part of IRC.split_cmd("PRIVMSG", {
         args: [this.current_channel.name, text]
       })){
-        this.irc.send("PRIVMSG", part);
-        this.current_channel.log(this.irc.me, "PRIVMSG", part.args[1]);
+        if(this.current_channel.name == '*status' && this.current_channel.network)
+          this.current_channel.network.do_expect_znc();
+        this.current_channel.irc.send("PRIVMSG", part);
+        this.current_channel.log(this.current_channel.irc.me, "PRIVMSG", part.args[1]);
       }
     }else{
       throw new Error("Not in a channel!");
@@ -106,14 +197,6 @@ send(text){
   return true;
 }
 
-cmd_quote(text){
-  this.irc.send_raw(text);
-}
-
-cmd_join(channel){
-  this.irc.send("JOIN", {args:[channel]});
-}
-
 cmd_part(channel){
   if(!channel){
     if(!this.current_channel)
@@ -122,7 +205,19 @@ cmd_part(channel){
       throw new Error("Can't part from nameless channel");
     channel = this.current_channel.name;
   }
-  this.irc.send("PART", {args:[channel]});
+  this.current_channel.irc.send("PART", {args:[channel]});
+}
+
+showChannel(channel){
+  if(this.current_channel == channel)
+    return false;
+  if(this.current_channel)
+    this.current_channel.remove();
+  this.T.channel.appendChild(channel);
+  this.current_channel = channel;
+  this.current_network = channel.network;
+  this.dispatchEvent(new CustomEvent("channel-shown", { detail: channel }));
+  return true;
 }
 
 async connect({nick, password, server}){
@@ -130,92 +225,25 @@ async connect({nick, password, server}){
     throw new Error("Already logged in or login still pending");
   this.T.login.state = 'PENDING';
   try {
-    await this.irc.connect({nick, password, url: server});
+    await this.networks[0].irc.connect({nick, password, url: server});
   } catch(error) {
     this.T.login.state = 'LOGGEDOUT';
+    this.networks[0].close();
     throw error;
   }
-}
-
-getChannel(name, {create}={}){
-  let resolve;
-  let promise = new Promise(r=>resolve=r);
-  resolve((async()=>{
-    name = name || null;
-    let channel = this.channel_list.get(name);
-    if(channel)
-      return channel;
-    this.channel_list.set(name, promise);
-    channel = Component("irc-channel", this.irc);
-    channel = await channel;
-    if(name)
-      channel.name = name;
-    this.dispatchEvent(new CustomEvent("channel-added", { detail: channel }));
-    if(!this.current_channel)
-      this.showChannel(name);
-    return channel;
-  })());
-  return promise;
-}
-
-async removeChannel(name){
-  if(!name)
-    return false;
-  let channel = await this.channel_list.get(name);
-  if(!channel)
-    return false;
-  this.channel_list.delete(name);
-  if(this.current_channel == channel)
-    this.current_channel = null;
-  channel.remove();
-  this.dispatchEvent(new CustomEvent("channel-removed", { detail: channel }));
-  return true;
-}
-
-async showChannel(name){
-  let channel = await this.channel_list.get(name);
-  if(!channel)
-    return false;
-  if(this.current_channel == channel)
-    return;
-  if(this.current_channel)
-    this.current_channel.remove();
-  this.T.channel.appendChild(channel);
-  this.current_channel = channel;
-  this.dispatchEvent(new CustomEvent("channel-shown", { detail: channel }));
-  return true;
-}
-
-async onmessage({detail}){
-  let [target, message] = detail.args;
-  let targets = this.irc.parse_message_targets(target);
-  for(let target of targets){
-    let target_channel;
-    if(target.me){
-      target_channel = detail.prefix.nick;
-    }else{
-      target_channel = target.normalized;
+  if(this.networks[0].irc.is_znc) try {
+    let networks = (await this.znc_status_request("ListNetworks")).values;
+    let network = networks.filter(network=>network['IRC Server'] == this.networks[0].irc.server_name)[0].Network;
+    this.networks[0].name = network;
+    networks = networks.filter(network=>network['IRC Server'] != this.networks[0].irc.server_name).map(x=>x.Network);
+    var [_, puser, _, pnetwork, ppassword] = password.match(/^([^/:]+)(\/([^:]+))?:(.*)$/);
+    for(let network of networks){
+      let password = `${puser}/${network}:${ppassword}`;
+      network = new Network(this, network);
+      await network.irc.connect({nick, password, url: server});
+      this.networks.push(network);
     }
-    let channel = await this.getChannel(target_channel, {create: true});
-    channel.log(detail.prefix, detail.command, message);
-  }
-}
-
-onirc_PRIVMSG(...x){ return this.onmessage(...x); }
-onirc_NOTICE (...x){ return this.onmessage(...x); }
-
-onirc_PART({detail}){
-  if(!detail.args.length)
-    return;
-  if(detail.prefix.me){
-    this.removeChannel(detail.args[0]);
-  }
-}
-
-async onirc_JOIN({detail}){
-  let target = detail.args[0];
-  if(detail.prefix.me){
-    let channel = await this.getChannel(target, {create: true});
-    channel.joined = true;
+  } catch(error) {
+    console.warn(error);
   }
 }

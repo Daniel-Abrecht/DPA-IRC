@@ -105,7 +105,7 @@ log(from, type, text){
   for(let part of text)
     line.text.appendChild(typeof part == 'string' ? document.createTextNode(part) : part);
 
-  let scroll_to_bottom = (this.T.chat.scrollTop+3 >= (this.T.chat.scrollHeight - this.T.chat.offsetHeight));
+  let scroll_to_bottom = (this.T.chat.scrollTop+13 >= (this.T.chat.scrollHeight - this.T.chat.offsetHeight));
   this.T.chat.appendChild(line.line);
   if(scroll_to_bottom)
     this.scroll_to_bottom();
@@ -128,7 +128,10 @@ cmd_me(text){
 }
 
 set name(name){
-  this.T.title.innerText = name;
+  let title = name;
+  if(this.network && this.network.name)
+    title = `${name} @ ${this.network.name}`;
+  this.T.title.innerText = title;
   this[$private].name = name;
 }
 

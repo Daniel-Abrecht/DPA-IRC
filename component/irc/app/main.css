@@ -3,6 +3,7 @@
   --input-color: #0F0;
   --fg-color: #FFF;
   --bg-color: #000;
+  --error-color: #A00;
   --line-height: 1.2;
   --link-color: #0FF;
   --link-visited-color: #0AA;
@@ -32,6 +33,7 @@ nav {
   height: 100%;
   white-space: normal;
   vertical-align: top;
+  overflow-y: auto;
 }
 
 main {
@@ -62,9 +64,31 @@ main {
   bottom: 0;
 }
 
+[\@="channel_list"] {
+  margin-left: 1rem;
+/*  border-left: 1px solid var(--fg-color);*/
+}
+
+[\@="networkentry"] {
+  border-bottom: 3px solid var(--fg-color);
+}
+
+[\@="networkentry"]:not(.connected) > [\@="name"] {
+  color: var(--error-color);
+}
+
+[\@="networkentry"] > [\@="name"] {
+  padding: 0.5rem;
+  cursor: pointer;
+  white-space: nowrap;
+  font-weight: bold;
+  font-style: italic;
+}
+
 [\@="channelentry"] {
-  padding: 1rem;
-  border-bottom: 1px solid var(--fg-color);
+  padding: 0.5rem;
+  padding-left: 0;
+  border-top: 1px solid var(--fg-color);
   cursor: pointer;
   white-space: nowrap;
 }

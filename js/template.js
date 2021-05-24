@@ -78,7 +78,7 @@ async function loadAllComponents(root){
     [root, ...root.querySelectorAll("*")]
       .filter( x => isComponentName(x.tagName) )
       .map( e => load_component(e.tagName.toLowerCase()) )
-      .map( x => Promise.resolve(x).catch(()=>{}) )
+      .map( x => Promise.resolve(x).catch(e=>{console.error(e);}) )
   );
 }
 
@@ -166,6 +166,13 @@ function make_url_absolute(url){
   return a.href;
 }
 
+class CustomBase extends EventTarget {
+  constructor(){
+    super();
+    this[this.constructor.$private] = {};
+  }
+}
+
 function create_component(name, { js, html, css, base_path }){
   let resolve, reject;
   let promise = new Promise((rs,rj)=>{
@@ -173,19 +180,34 @@ function create_component(name, { js, html, css, base_path }){
     reject = (...x)=>{ console.error(...x); return rj(...x); }
   });
   (async()=>{
-    if(!js)
-      js = '';
-    let custom_base = CustomBaseElement;
+    if(!js) js = [];
+    if(!js[0])
+      js[0] = {name:'main', code:''};
     let $private = Symbol(name);
-    let custom_element = null;
     try {
-      custom_element = eval(`(class C_${name.replace(/-/g,'_')} extends custom_base {\n${js}\n})` + (base_path ? `\n//# sourceURL=${make_url_absolute(base_path)}main.js` : ''));
+      let arg_names = js.map(x=>x.name[0].toUpperCase()+x.name.slice(1));
+      for(const cls of js){
+        let parts = Function('custom_base', '$private', 'base_path', `\
+let ${arg_names.join(', ')};
+class C_${name.replace(/-/g,'_')}_${cls.name} extends custom_base {
+${cls.code}
+}
+return { init: (...x)=>{${arg_names.map((x,i)=>x+'=x['+i+'];').join('')}}, class: C_${name.replace(/-/g,'_')}_${cls.name} }
+` + (base_path ? `//# sourceURL=${make_url_absolute(base_path)}${cls.name}.js` : '')
+        )(cls===js[0] ? CustomBaseElement : CustomBase, $private, base_path);
+        cls.class = parts.class;
+        cls.init = parts.init;
+        cls.class.$private = $private;
+      }
+      let args = js.map(x=>x.class);
+      for(const cls of js)
+        cls.init(...args);
     } catch(e) {
       console.error(e);
       throw e;
     }
+    let custom_element = js[0].class;
     // TODO: Add fallback in case custom_element is null
-    custom_element.$private = $private;
     custom_element.$ready_promise = promise;
     let template = Template(html);
     if(css){
@@ -224,15 +246,30 @@ async function load_component(name){
     let base_path = 'component/'+name.replace(/-/g,'/')+'/';
 
     // Await them as late as possible for concurrencies sake
-    let html = fetch_text(false, base_path + 'main.html', {headers: {Accept: 'text/html'}});
-    let css  = fetch_text(true , base_path + 'main.css', {headers: {Accept: 'text/css'}});
-    let js   = fetch_text(true , base_path + 'main.js', {headers: {Accept: 'text/javascript'}});
+    let html = fetch_text(false, base_path + 'main.html', {headers: {Accept: 'text/html'},cache: "no-cache"});
+    let css  = fetch_text(true , base_path + 'main.css', {headers: {Accept: 'text/css'},cache: "no-cache"});
+    let js   = fetch_text(true , base_path + 'main.js', {headers: {Accept: 'text/javascript'},cache: "no-cache"});
 
     html = await html;
     css  = await css;
     js   = await js;
 
-    return create_component(name, { js, html, css, base_path });
+    let mods = [];
+    if(js){
+      let res = (js.match(/^(load +.*\n)*/g) || [])[0] || '';
+      if(res) js = js.slice(res.length);
+      res = res && res.split('\n') || [];
+      mods = [];
+      for(let mod of res){
+        let [c, v] = mod.split(' ', 2);
+        if(c == 'load' && v)
+          mods.push(fetch_text(false , base_path + v + '.js', {headers: {Accept: 'text/javascript'},cache: "no-cache"}).then(m=>({name: v, code: m})));
+      }
+      mods = (await Promise.all(mods)).filter(x=>x);
+      mods.unshift({name: 'main', code: js});
+    }
+
+    return create_component(name, { js: mods, html, css, base_path });
   })();
 }
 

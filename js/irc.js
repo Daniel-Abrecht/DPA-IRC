@@ -158,15 +158,15 @@ let responses = {
   501: { name: 'ERR_UMODEUNKNOWNFLAG' },
   502: { name: 'ERR_USERSDONTMATCH' }
 };
-for(let value of Object.values(responses))
-   responses[value.name] = value;
+for(let [code, value] of Object.entries(responses)){
+  value.code = +code;
+  responses[value.name] = value;
+}
 
 class IRCError extends Error {
   constructor(params){
     super(IRCError.makeMessage(params));
-    this.code = params.code;
-    this.args = params.args;
-    this.argstr = params.argstr;
+    Object.assign(this, params);
   }
   static makeMessage(params){
     let code = params.code;
@@ -179,13 +179,97 @@ class IRCError extends Error {
   }
 }
 
+
+const SynchronousPromise = (()=>{
+  const $private = Symbol("private");
+  const resolved = Symbol("resolved");
+  const SETTLED  = 1;
+  const RESOLVED = 2;
+  const REJECTED = 3;
+  class SynchronousPromise {
+    constructor(callback){
+      this[$private] = {
+        resolve: [],
+        reject: [],
+        state: 0,
+        result: null
+      };
+      Object.seal(this[$private]);
+      callback(r=>{if(!this[$private].state)this[resolved](r,false);}, r=>{if(!this[$private].state)this[resolved](r,true);});
+    }
+    [resolved](result, rejected){
+      this[$private].state = SETTLED;
+      let stops = new Set();
+      const unpack = rejected=>(result)=>{
+        if(this[$private].state != SETTLED)
+          return;
+        if(stops.has(result)){
+          result = new Error("Recursive promise will never complete!");
+          rejected = true;
+        }
+        stops.add(result);
+        if(result && result.then){
+          try {
+            return result.then(unpack(false), unpack(true));
+          } catch(error) {
+            result = error;
+            rejected = true;
+          }
+        }
+        this[$private].state = rejected ? REJECTED : RESOLVED;
+        this[$private].result = result;
+        for(let callback of this[$private][rejected?'reject':'resolve'])
+          callback(result);
+        this[$private].reject = null;
+        this[$private].resolve = null;
+      };
+      unpack(rejected)(result);
+    }
+    then(onresolve, onreject){
+      if(!onresolve) onresolve = (x) => x;
+      if(!onreject ) onreject  = (e) => {throw e;};
+      const promise = new SynchronousPromise(()=>{});
+      if(!this[$private].state || this[$private].state == SETTLED){
+        this[$private].resolve.push((result)=>promise[resolved]({then: (re,rj)=>re(onresolve(result))}, false));
+        this[$private].reject .push((result)=>promise[resolved]({then: (re,rj)=>re(onreject (result))}, false));
+      }else{
+        promise[resolved]({then: (re,rj)=>re(onresolve(this[$private].result))}, this[$private].state == REJECTED);
+      }
+      return promise;
+    }
+    catch(callback){
+      return this.then(null, callback);
+    }
+    static resolve(obj){
+      const promise = new SynchronousPromise(()=>{});
+      promise[resolved](obj, true);
+      return promise;
+    }
+  }
+  return SynchronousPromise;
+})();
+
 class IRC extends EventTarget {
 
-  async connect({
-    url, user, password, nick, realname,
-    message_length_limit,
-    request_timeout
-  }){
+  IRC(){
+    this.ignored = new Set();
+  }
+
+  async connect(params){
+    this.is_znc = true;
+    this.ignored = new Set();
+
+    if(params){
+      this.connection_params = params;
+    }else{
+      params = this.connection_params;
+    }
+
+    let {
+      url, user, password, nick, realname,
+      message_length_limit,
+      request_timeout
+    } = params;
 
     if(!url)
       url = (location.protocol == 'http:' ? 'ws://' : 'wss://') + location.host + location.pathname;
@@ -210,7 +294,7 @@ class IRC extends EventTarget {
     this.ws.binaryType = 'arraybuffer';
 
     let closed = false;
-    var connection_promise = new Promise((resolve, reject)=>{
+    var connection_promise = new SynchronousPromise((resolve, reject)=>{
       this.ws.onopen = event=>{
         if(connection_promise == this.pending_answare)
           this.pending_answare = null;
@@ -239,13 +323,22 @@ class IRC extends EventTarget {
     this.buffer = "";
     this.ignore_command = false;
     this.generation = 0;
-    if(password)
+    if(password){
       this.send("PASS", {args:[password]});
-    this.send("NICK", {args:[nick]});
-    this.send("USER", {args:[user, 0, location.hostname, realname]});
+      this.send("NICK", {args:[nick]});
+      this.server_name = (await this.send("USER", {args:[user, 0, location.hostname, realname]})).prefix.full;
+    }else{
+      this.send("NICK", {args:[nick]});
+      this.send("USER", {args:[user, 0, location.hostname, realname]});
+    }
 
     await connection_promise;
     connection_promise = null;
+  }
+
+  ignore_notice(prefix, timeout=500){
+    this.ignored.add(prefix);
+    setTimeout(timeout, ()=>this.ignored.remove(prefix));
   }
 
   parse_message(str){
@@ -278,7 +371,9 @@ class IRC extends EventTarget {
     if(/[0-9]{3}/.test(command)){
       result.type = 'response';
       result.code = command|0;
-      if(result.code < 100){
+      if(result.code == 1){
+        result.category = 'reply';
+      }else if(result.code < 100){
         result.category = 'client-info';
       }else if(result.code >= 200 && result.code < 400){
         result.category = 'reply';
@@ -307,7 +402,7 @@ class IRC extends EventTarget {
         this.pending_answare = null;
       } break;
       case 'reply': {
-        if(!responses[response.code] || !responses[response.code].nonfinal){
+        if(responses[response.code] && !responses[response.code].nonfinal){
           if(this.pending_answare){
             this.pending_answare.resolve(response);
             this.pending_answare = null;
@@ -326,6 +421,8 @@ class IRC extends EventTarget {
     let message = this.parse_message(str);
     switch(message.type){
       case 'command': {
+        if(message.command == 'NOTICE' && this.ignored.has(message.prefix.full))
+          break;
         let func = "onirc_" + message.command;
         if(this[func] instanceof Function){
           return this[func](message.prefix, ...message.args);
@@ -350,7 +447,7 @@ class IRC extends EventTarget {
     setTimeout(()=>{this.generation+=1;}, 0);
     let generation = this.generation;
     let resolve, reject;
-    let pending_answare = new Promise((rs,rj)=>{
+    let pending_answare = new SynchronousPromise((rs,rj)=>{
       resolve = rs;
       reject = rj;
     });
@@ -362,17 +459,18 @@ class IRC extends EventTarget {
         await this.pending_answare;
       this.ws.send(utf8.encoder.encode(str+'\r\n'));
       setTimeout(()=>pending_answare.reject(new IRCError({code:-1, args: [], argstr: ''})), timeout || this.request_timeout);
-      await pending_answare;
+      await pending_answare.catch(e=>{});
       if(this.pending_answare == pending_answare)
         this.pending_answare = null;
     })();
     return {
-      then(callback){
+      then: (resolve, reject)=>{
         if(this.generation != generation)
           throw new Error("then/await must be called before next send\n");
-        pending_answare.then(callback);
+        let res = pending_answare.then(resolve, reject);
         pending_answare.wait = true;
         this.pending_answare = pending_answare;
+        return res;
       }
     };
   }
@@ -513,4 +611,7 @@ class IRC extends EventTarget {
     };
   }
 
+  close(){
+    this.ws.close();
+  }
 }
