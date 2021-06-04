@@ -444,13 +444,17 @@ class IRC extends EventTarget {
       throw new Error("Invalid message");
     this.parse_message(str); // Verify that this is a valid IRC message
     this.generation += 1;
-    setTimeout(()=>{this.generation+=1;}, 0);
     let generation = this.generation;
     let resolve, reject;
     let pending_answare = new SynchronousPromise((rs,rj)=>{
       resolve = rs;
       reject = rj;
     });
+    setTimeout(()=>{
+      this.generation += 1;
+      if(pending_answare && !pending_answare.wait)
+        pending_answare.reject(new IRCError({code:-1, args: [], argstr: ''}));
+    }, 0);
     pending_answare.resolve = resolve;
     pending_answare.reject = reject;
     pending_answare.catch(()=>{}); // Ignore uncatched errors. Errors are the default.

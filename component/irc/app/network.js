@@ -19,6 +19,12 @@ constructor(app, name=null){
 
   this.T.network_list.appendChild(this.NT.networkentry);
 
+  this.NT.name.addEventListener("click", ()=>{
+    this.app.current_network = this;
+    this.app.current_channel.remove();
+    this.app.current_channel = null;
+  });
+
   this.expect_znc = false;
 
   this.addEventListener("channel-added", ({detail: channel})=>{

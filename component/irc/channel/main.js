@@ -11,6 +11,7 @@ mount(){
   this.mevlist.push([this.parentComponent, "channel-shown", ()=>this.scroll_to_bottom()]);
   for(let [target, ...x] of this.mevlist)
     target.addEventListener(...x);
+  this.name = this.name;
 }
 
 umount(){
