@@ -4,22 +4,60 @@
   flex-direction: column;
 }
 
-h1 {
+.title {
   padding: 0.5rem;
   border-bottom: 1px solid var(--fg-color);
+}
+
+.title h1 {
+  padding: 0;
   margin: 0;
   font-size: 1.5em;
   font-family: inherit;
   font-weight: normal;
 }
 
-[\@=chat] {
+.title input[type="button"] {
+  float: right;
+  margin: 0;
+  padding: 0.25rem 0.5rem;
+  border: 0 none;
+  background-color: var(--input-color);
+  cursor: pointer;
+}
+
+[\@=chat], .users {
+  display: none;
   flex-basis: 100%;
   overflow: auto;
   padding: 0.2rem;
   word-wrap: break-word;
   word-wrap: anywhere;
   overflow-wrap: anywhere;
+}
+
+:host([data-tab="chat" ]) [\@=chat] { display: block; }
+:host([data-tab="users"]) .users    { display: block; }
+
+[\@=users] {
+  column-width: 20ex;
+  white-space: nowrap;
+}
+
+[\@=users] [\@=user] {
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+[\@=users] [\@=user] [\@=name] {
+  color: var(--nick-color);
+}
+
+[\@=users] [\@=user] [\@=mode] {
+  display: inline-block;
+  color: var(--fg-color);
+  width: 2em;
+  text-align: right;
 }
 
 [\@=line]::before {
@@ -69,6 +107,20 @@ h1 {
 [\@=line].me [\@=name] {
   color: var(--fg-color);
   font-weight: bold;
+}
+
+[\@="topic"] {
+  display: block;
+  font-family: monospace;
+  white-space: pre-wrap;
+  padding: 0.5rem;
+  border-bottom: 1px dotted var(--fg-color);
+  margin-bottom: 0.25rem;
+  color: var(--fg-color);
+}
+
+[\@="topic"]:empty {
+  display: none;
 }
 
 a {

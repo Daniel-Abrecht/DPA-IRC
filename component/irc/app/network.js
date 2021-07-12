@@ -5,6 +5,7 @@ constructor(app, name=null){
   this.app = app;
   this.T = app.T;
   this.NT = this.T.network_list_entry.create();
+  this.view = this.T.network_view.create();
 
   this.reconnect_attempts = 0;
 
@@ -16,13 +17,13 @@ constructor(app, name=null){
   this.irc = new IRC();
   this.irc.addEventListener('open', ()=>this.onopen());
   this.irc.addEventListener('close', ()=>this.onclose());
+  this.irc.addEventListener('reply', r=>this.onreply(r));
 
   this.T.network_list.appendChild(this.NT.networkentry);
 
   this.NT.name.addEventListener("click", ()=>{
+    this.app.main_view = this.view.root;
     this.app.current_network = this;
-    this.app.current_channel.remove();
-    this.app.current_channel = null;
   });
 
   this.expect_znc = false;
@@ -63,19 +64,12 @@ constructor(app, name=null){
   for(let k of Object.getOwnPropertyNames(Object.getPrototypeOf(this)))
     if(k.startsWith('onirc_') && this[k] instanceof Function)
       this.irc.addEventListener('irc-'+k.slice(6), (...x)=>this[k](...x));
-
-  this.addEventListener("resize", ()=>{
-    if(this.offsetWidth >= 40 * parseFloat(getComputedStyle(document.documentElement).fontSize)){
-      this.classList.remove("mobile");
-    }else{
-      this.classList.add("mobile");
-    }
-  });
 }
 
 set name(name){
   this[$private].name = name;
   this.NT.name.innerText = name || 'IRC';
+  this.view.title.innerText = name || 'IRC';
   for(let channel of this.channel_list)
     channel.name = channel.name;
 }
@@ -98,10 +92,10 @@ getChannel(name, {create}={}){
   let promise = new Promise(r=>resolve=r);
   resolve((async()=>{
     name = name || null;
-    let channel = this.channel_list.get(name);
+    let channel = this.channel_list.get(name.toLowerCase());
     if(channel || !create)
       return channel;
-    this.channel_list.set(name, promise);
+    this.channel_list.set(name.toLowerCase(), promise);
     channel = Component("irc-channel", this.irc);
     channel = await channel;
     channel.network = this;
@@ -119,10 +113,10 @@ getChannel(name, {create}={}){
 async removeChannel(name){
   if(!name)
     return false;
-  let channel = await this.channel_list.get(name);
+  let channel = await this.channel_list.get(name.toLowerCase());
   if(!channel)
     return false;
-  this.channel_list.delete(name);
+  this.channel_list.delete(name.toLowerCase());
   if(this.app.current_channel == channel)
     this.app.current_channel = null;
   channel.remove();
@@ -132,7 +126,7 @@ async removeChannel(name){
 }
 
 async showChannel(name){
-  let channel = await this.channel_list.get(name);
+  let channel = await this.channel_list.get(name.toLowerCase());
   if(!channel)
     return false;
   if(!this.app.showChannel(channel))
@@ -237,5 +231,43 @@ async cmd_msg(rem){
       this.do_expect_znc();
     this.irc.send("PRIVMSG", part);
     channel.log(this.irc.me, "PRIVMSG", part.args[1]);
+  }
+}
+
+async onreply({detail: reply}){
+  const R = responses;
+  switch(reply.code){
+    case R.RPL_TOPIC.code: {
+      let [nchannel, topic] = reply.args.slice(-2);
+      let channel = await this.getChannel(nchannel, {create: true});
+      if(!channel) break;
+      channel.topic = topic;
+    } break;
+    case R.RPL_NAMREPLY.code: {
+      let [nchannel, names] = reply.args.slice(-2);
+      let channel = await this.getChannel(nchannel, {create: true});
+      if(!channel) break;
+      names = Object.fromEntries(names.split(/\s+/).map(x=>[...x.match(/^([+@]?)(.*)$/)]).map(([_,m,n])=>[n,{mode:m||null}]));
+      if(!channel.next_users)
+        channel.next_users = Object.create(null);
+      Object.assign(channel.next_users, names);
+    } break;
+    case R.RPL_ENDOFNAMES.code: {
+      let [nchannel, message] = reply.args.slice(-2);
+      let channel = await this.getChannel(nchannel, {create: true});
+      if(!channel) break;
+      channel.users = channel.next_users;
+      channel.next_users = Object.create(null);
+    } break;
+    default: {
+      let e = this.T.network_reply.create();
+      e.code.innerText = reply.code;
+      for(let arg of reply.args){
+        let earg = document.createElement("span");
+        earg.innerText = arg;
+        e.info.appendChild(earg);
+      }
+      this.view.main.appendChild(e.reply);
+    } break;
   }
 }

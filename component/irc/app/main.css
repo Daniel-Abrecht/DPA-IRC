@@ -50,18 +50,63 @@ main {
   width: 100%;
 }
 
-[\@="channel"] {
+[\@="main_view"] {
   position: relative;
   display: inline-block;
   flex-basis: 100%;
 }
 
-[\@="channel"] > irc-channel {
+[\@="main_view"] > * {
   position: absolute;
   left: 0;
   right: 0;
   top: 0;
   bottom: 0;
+}
+
+[\@="main_view"] > [\@="root"] {
+  display: flex;
+  flex-direction: column;
+}
+
+[\@="main_view"] [\@="title"] {
+  padding: 0.5rem;
+  border-bottom: 1px solid var(--fg-color);
+  margin: 0;
+  font-size: 1.5em;
+  font-family: inherit;
+  font-weight: normal;
+}
+
+[\@="main_view"] [\@=main] {
+  flex-basis: 100%;
+  overflow: auto;
+  padding: 0.2rem;
+  word-wrap: break-word;
+  word-wrap: anywhere;
+  overflow-wrap: anywhere;
+}
+
+[\@="reply"] {
+  font-family: monospace;
+  color: var(--input-color);
+  white-space: no-wrap;
+}
+
+[\@="reply"] [\@="info"] {
+  white-space: pre-wrap;
+}
+
+[\@="reply"] [\@="info"] > span {
+  padding: 0.2rem 0.4rem;
+  border-left: 1px dotted var(--fg-color);
+}
+
+[\@="reply"] [\@="code"] {
+  display: inline-block;
+  padding: 0.2rem 0.4rem;
+  min-width: 3ex;
+  text-align: right;
 }
 
 [\@="channel_list"] {

@@ -389,8 +389,8 @@ class IRC extends EventTarget {
     return result;
   }
 
-  show_reply({prefix, code, argstr}){
-    console.log(prefix, code, argstr);
+  show_reply(response){
+    this.dispatchEvent(new CustomEvent("reply", {detail: response}));
   }
 
   onresponse(response){

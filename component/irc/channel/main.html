@@ -1,9 +1,20 @@
-<h1 @="title"></h1>
+<div class="title">
+  <input type="button" @="userlistbtn" value="👥"/>
+  <h1 @="title"></h1>
+</div>
+<div class="users"><div @="users"></div></div>
 <div @="chat">
+  <span @="topic"></span>
   <template @="line">
     <div @="line">
       <span @="name"></span>
       <span @="text"></span>
+    </div>
+  </template>
+  <template @="user">
+    <div @="user">
+      <span @="mode"></span>
+      <span @="name"></span>
     </div>
   </template>
 </div>

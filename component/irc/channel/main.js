@@ -5,6 +5,9 @@ constructor(irc){
     throw new Error("IRC instance needed for instanciation");
   this.irc = irc;
   this.mevlist = [];
+  this.dataset.tab = 'chat';
+  this.T.title.addEventListener("click", ()=>this.dataset.tab='chat');
+  this.T.userlistbtn.addEventListener("click", ()=>this.dataset.tab='users');
 }
 
 mount(){
@@ -138,4 +141,29 @@ set name(name){
 
 get name(){
   return this[$private].name || null;
+}
+
+set topic(topic){
+  this[$private].topic = topic || '';
+  this.T.topic.innerText = this.topic;
+}
+
+get topic(){
+  return this[$private].topic || '';
+}
+
+set users(users){
+  this[$private].users = users;
+  this.T.users.innerHTML = '';
+  for(let [name,info] of Object.entries(users)){
+    let user = this.T.user.create();
+    user.mode.innerText = info.mode || '';
+    user.name.innerText = name || '';
+    user.user.style.setProperty('--nick-color', this.constructor.strcolor(name||''));
+    this.T.users.appendChild(user.user);
+  }
+}
+
+get users(){
+  return this[$private].users || Object.create(null);
 }

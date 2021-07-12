@@ -23,6 +23,15 @@ constructor(){
       this.T.text.style.height = '';
     }
   });
+
+  this.addEventListener("resize", ()=>{
+    if(this.offsetWidth >= 40 * parseFloat(getComputedStyle(document.documentElement).fontSize)){
+      this.classList.remove("mobile");
+    }else{
+      this.classList.add("mobile");
+    }
+  });
+
 }
 
 onopen(){
@@ -208,12 +217,23 @@ cmd_part(channel){
   this.current_channel.irc.send("PART", {args:[channel]});
 }
 
+set main_view(element){
+  this.current_channel = null;
+  this.current_network = null;
+  this.T.main_view.innerHTML = '';
+  if(element)
+    this.T.main_view.appendChild(element);
+}
+
+get main_view(){
+  return this.T.main_view.children[0] || null;
+}
+
 showChannel(channel){
   if(this.current_channel == channel)
     return false;
-  if(this.current_channel)
-    this.current_channel.remove();
-  this.T.channel.appendChild(channel);
+  this.main_view = channel;
+  channel.dataset.tab = 'chat';
   this.current_channel = channel;
   this.current_network = channel.network;
   this.dispatchEvent(new CustomEvent("channel-shown", { detail: channel }));

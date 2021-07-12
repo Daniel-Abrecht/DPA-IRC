@@ -1,7 +1,14 @@
 <irc-login @="login">
   <div slot="pending">Connecting...</div>
   <main>
-    <div @="channel"></div>
+    <div @="main_view">
+      <template @="network_view">
+        <div @="root">
+          <h1 @="title"></h1>
+          <div @="main"></div>
+        </div>
+      </template>
+    </div>
     <form @="chatline">
       <textarea @="text"></textarea>
       <input @="submit" type="submit" value="⮞"/>
@@ -24,4 +31,12 @@
       </template>
     </div>
   </nav>
+
+  <template @="network_reply">
+    <div @="reply">
+      <span @="code"></span>
+      <span @="info"></span>
+    </div>
+  </template>
+
 </irc-login>
